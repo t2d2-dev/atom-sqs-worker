@@ -27,7 +27,7 @@ class SignalHandler:
 
 def process_message(msg):
     """Process message"""
-    print(f"Received Message: ID: {msg.MessageId} Body: {msg.body}")
+    print(f"Received Message: Body: {msg.body}")
     # Read the config
 
     # Create a task folder
@@ -54,8 +54,8 @@ if __name__ == "__main__":
         for message in messages:
             try:
                 process_message(message)
+                message.delete()
             except Exception as err:
                 print("**ERROR Processing Message**")
                 print(traceback.format_exc())
 
-            message.delete()
