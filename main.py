@@ -8,7 +8,9 @@ QUEUE_URL = os.getenv("SQS_QUEUE", "https://sqs.us-east-1.amazonaws.com/91037148
 WAIT_TIME = int(os.getenv("WAIT_TIME", "10"))
 VISIBILITY_TIMEOUT = int(os.getenv("VISIBILITY_TIMEOUT", "3600"))
 
-client = boto3.client("sqs")
+sqs = boto3.resource('sqs')
+queue = sqs.Queue(QUEUE_URL)
+
 # queue = sqs.get_queue_by_name(QueueName=QUEUE_NAME)
 
 
@@ -45,8 +47,7 @@ def process_message(msg):
 if __name__ == "__main__":
     signal_handler = SignalHandler()
     while not signal_handler.received_signal:
-        messages = client.receive_messages(
-            QueueUrl=QUEUE_URL,
+        messages = queue.receive_messages(
             MaxNumberOfMessages=1,
             WaitTimeSeconds=WAIT_TIME,
             VisibilityTimeout=VISIBILITY_TIMEOUT,
