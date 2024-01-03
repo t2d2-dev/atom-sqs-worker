@@ -45,7 +45,7 @@ def process_message(msg):
 if __name__ == "__main__":
     signal_handler = SignalHandler()
     while not signal_handler.received_signal:
-        messages = client.receive_message(
+        messages = client.receive_messages(
             QueueUrl=QUEUE_URL,
             MaxNumberOfMessages=1,
             WaitTimeSeconds=WAIT_TIME,
