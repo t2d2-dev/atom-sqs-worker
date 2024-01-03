@@ -29,7 +29,7 @@ class SignalHandler:
 
 def process_message(msg):
     """Process message"""
-    print(f"Received Message: ID: {msg.MessageId} Body: {msg.body}")
+    print(f"Received Message: ID: {dir(message)} Body: {msg.body}")
     # Read the config
 
     # Create a task folder
