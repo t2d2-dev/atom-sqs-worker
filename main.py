@@ -141,7 +141,7 @@ def process_message(msg):
         # Get input
         dkr = msg.body["docker"]
         config = msg.body.get("config", {})
-        print(f"Received Message: \nID: {task_id} \nCONFIG: {config}")
+        logger.info("Received Message: \nID: %s \nCONFIG: %s", task_id, config)
 
         # Create all task folders
         task_folder = os.path.join(ROOT_FOLDER, task_id)
