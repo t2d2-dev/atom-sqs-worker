@@ -3,12 +3,15 @@
 import json
 import logging
 import os
+import platform
 import subprocess
 import traceback
 from signal import SIGINT, SIGTERM, signal
 
 import boto3
 import docker
+import psutil
+import requests
 import watchtower
 from docker.errors import ContainerError
 from docker.types import LogConfig, Mount
@@ -40,12 +43,70 @@ class SignalHandler:
         self.received_signal = True
 
 
-def set_logger(task_id):
+def get_system_info():
+    """Retrieve system information"""
+    try:
+        info = {}
+        info["platform"] = platform.system()
+        info["platform-release"] = platform.release()
+        info["platform-version"] = platform.version()
+        info["architecture"] = platform.machine()
+        info["processor"] = platform.processor()
+        info["cpu_count"] = psutil.cpu_count()
+        info["cpu_percent"] = psutil.cpu_percent()
+        info["mem"] = str(round(psutil.virtual_memory().total / (1024.0**3))) + " GB"
+        info["mem_percent"] = psutil.virtual_memory().percent
+        info["disk"] = str(round(psutil.disk_usage('/').total / (1024.0**3))) + " GB"
+        info["disk_percent"] = psutil.disk_usage('/').percent
+
+        return info
+    except Exception as e:
+        logging.exception(e)
+        return {}
+
+
+def get_instance_data():
+    """Retreive instance metadata"""
+    info = get_system_info()
+    url = "http://169.254.169.254/latest/api/token"
+    header = {"X-aws-ec2-metadata-token-ttl-seconds": "21600"}
+    res = requests.put(url, headers=header, timeout=5)  # Add timeout argument
+    if res.status_code != 200:
+        print("*Warning* Could not retrieve token")
+        return info
+
+    token = res.content.decode("utf-8")
+    header = {"X-aws-ec2-metadata-token": token}
+    keys = [
+        "instance-id",
+        "hostname",
+        "placement/region",
+        "placement/availability-zone",
+        "public-ipv4",
+        "system" "ami-id",
+    ]
+
+    for key in keys:
+        url = f"http://169.254.169.254/latest/meta-data/{key}"
+        res = requests.get(url, headers=header, timeout=5)
+        if res.status_code == 200:
+            info[key] = res.content.decode("utf-8")
+
+    return info
+
+
+def set_logger(task_id, level='info'):
     """Setup logging to cloudwatch"""
-    logging.basicConfig(level=logging.INFO)
+    logging_levels = {
+        'debug': logging.DEBUG,
+        'info': logging.INFO,
+        'warning': logging.WARNING,
+        'error': logging.ERROR,
+        'critical': logging.CRITICAL
+    }
+    logging.basicConfig(level=logging_levels[level])
     handler = watchtower.CloudWatchLogHandler(
-        log_group_name=LOGS_GROUP,
-        log_stream_name=task_id
+        log_group_name=LOGS_GROUP, log_stream_name=task_id
     )
     formatter = logging.Formatter(
         "%(asctime)s - %(levelname)s - %(message)s",
@@ -115,7 +176,8 @@ def run_container(dkr, task_id):
         if isinstance(container, bytes):
             logger.info("=============================================")
             logs = container.decode("utf-8")
-            if len(logs): logger.info(logs)
+            if len(logs):
+                logger.info(logs)
             logger.info("=============================================")
 
             return {"success": True}
@@ -132,55 +194,50 @@ def run_container(dkr, task_id):
 
 def process_message(msg):
     """Process message"""
-    try:
-        task_id = msg.message_id
+    task_id = msg.message_id
+    event = json.loads(msg.body)
+    dkr = event["docker"]
+    config = event.get("config", {})
 
-        # Setup cloudwatch logger
-        set_logger(task_id)
-        logger = logging.getLogger(task_id)
-        logger.info("Started processing: %s", task_id)
+    # Setup cloudwatch logger
+    set_logger(task_id, event.get('log_level', "info"))
+    logger = logging.getLogger(task_id)
 
-        # Update status
-        status_update(task_id, "running")
+    # Log system info
+    logger.info(get_instance_data())
 
-        # Get input
-        logger.info("Message Body: %s", msg.body)
-        body = json.loads(msg.body)
-        dkr = body["docker"]
-        config = body.get("config", {})
-        logger.info("Received Message: \nID: %s \nCONFIG: %s", task_id, config)
+    # Update status
+    status_update(task_id, "running")
 
-        # Create all task folders
-        task_folder = os.path.join(ROOT_FOLDER, task_id)
-        input_folder = os.path.join(task_folder, "input")
-        logs_folder = os.path.join(task_folder, "logs")
-        output_folder = os.path.join(task_folder, "output")
-        for folder in [input_folder, logs_folder, output_folder]:
-            logger.info("Creating folder: %s", folder)
-            os.makedirs(folder)
+    # Get input
+    logger.debug("Parsed Message: \nID: %s \nCONFIG: %s", task_id, config)
 
-        # Write the task config
-        config_file = os.path.join(input_folder, "task_config.json")
-        with open(config_file, "w", encoding="utf-8") as f:
-            json.dump(config, f, indent=2)
-        logger.info("Wrote %s", config_file)
+    # Create all task folders
+    task_folder = os.path.join(ROOT_FOLDER, task_id)
+    input_folder = os.path.join(task_folder, "input")
+    logs_folder = os.path.join(task_folder, "logs")
+    output_folder = os.path.join(task_folder, "output")
+    for folder in [input_folder, logs_folder, output_folder]:
+        logger.debug("Creating folder: %s", folder)
+        os.makedirs(folder)
 
-        # Run the docker processor
-        result = run_container(dkr, task_id)
+    # Write the task config
+    config_file = os.path.join(input_folder, "task_config.json")
+    with open(config_file, "w", encoding="utf-8") as f:
+        json.dump(config, f, indent=2)
+    logger.info("Wrote %s", config_file)
 
-        # Update success/failure status
-        if result["success"]:
-            status_update(task_id, "completed")
-        else:
-            status_update(task_id, "failed")
+    # Run the docker processor
+    result = run_container(dkr, task_id)
 
-        # return result
-        return result
+    # Update success/failure status
+    if result["success"]:
+        status_update(task_id, "completed")
+    else:
+        status_update(task_id, "failed")
 
-    except Exception as err:
-        logger.error("Error occurred %s", err)
-        logger.error(traceback.format_exc())
-        return {"success": False, "function": "process_message", "err": err}
+    # return result
+    return result
 
 
 #############################################################################
