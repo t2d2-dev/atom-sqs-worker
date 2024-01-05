@@ -114,7 +114,8 @@ def run_container(dkr, task_id):
 
         if isinstance(container, bytes):
             logger.info("=============================================")
-            logger.info(container.decode("utf-8"))
+            logs = container.decode("utf-8")
+            if len(logs): logger.info(logs)
             logger.info("=============================================")
 
             return {"success": True}
