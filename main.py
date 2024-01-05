@@ -24,7 +24,7 @@ LOGS_GROUP = os.getenv("LOGS_GROUP", "atom_workers")
 ROOT_FOLDER = "/tmp"
 STANDARD_MOUNT_PATH = "/data"
 MODELS_MOUNT_PATH = "/models"
-MODELS_FOLDER = "./"
+MODELS_FOLDER = "/"
 
 
 class SignalHandler:
@@ -43,9 +43,12 @@ class SignalHandler:
 def set_logger(task_id):
     """Setup logging to cloudwatch"""
     logging.basicConfig(level=logging.INFO)
-    handler = watchtower.CloudWatchLogHandler(log_group_name=LOGS_GROUP)
+    handler = watchtower.CloudWatchLogHandler(
+        log_group_name=LOGS_GROUP,
+        log_stream_name=task_id
+    )
     formatter = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        "%(asctime)s - %(levelname)s - %(message)s",
         "%Y-%m-%d %H:%M:%S %Z",
     )
     handler.setFormatter(formatter)
@@ -86,7 +89,7 @@ def run_container(dkr, task_id):
             logger.info("GPU not found.")
 
         # Create client
-        client = docker.from_env(assert_hostname=False)
+        client = docker.from_env()
         logger.info("Created docker client")
 
         # Pull Image
@@ -122,6 +125,7 @@ def run_container(dkr, task_id):
 
     except Exception as ex:
         logger.exception(ex)
+        logger.error(traceback.format_exc())
         return {"success": False, "function": "run_container", "err": ex}
 
 
@@ -139,8 +143,10 @@ def process_message(msg):
         status_update(task_id, "running")
 
         # Get input
-        dkr = msg.body["docker"]
-        config = msg.body.get("config", {})
+        logger.info("Message Body: %s", msg.body)
+        body = json.loads(msg.body)
+        dkr = body["docker"]
+        config = body.get("config", {})
         logger.info("Received Message: \nID: %s \nCONFIG: %s", task_id, config)
 
         # Create all task folders
@@ -155,7 +161,7 @@ def process_message(msg):
         # Write the task config
         config_file = os.path.join(input_folder, "task_config.json")
         with open(config_file, "w", encoding="utf-8") as f:
-            json.dump(msg.body["config"], f, indent=2)
+            json.dump(config, f, indent=2)
         logger.info("Wrote %s", config_file)
 
         # Run the docker processor
@@ -171,6 +177,8 @@ def process_message(msg):
         return result
 
     except Exception as err:
+        logger.error("Error occurred %s", err)
+        logger.error(traceback.format_exc())
         return {"success": False, "function": "process_message", "err": err}
 
 
@@ -180,6 +188,7 @@ def process_message(msg):
 def main():
     """Main fn: SQS Listener and message processor"""
     try:
+        print("ATOM Worker listening for messages")
         signal_handler = SignalHandler()
         queue_url = f"https://sqs.{AWS_REGION}.amazonaws.com/{AWS_ACCOUNT}/{QUEUE_NAME}"
         sqs = boto3.resource("sqs")
