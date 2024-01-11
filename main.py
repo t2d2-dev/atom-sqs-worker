@@ -16,9 +16,8 @@ import requests
 import watchtower
 from docker.errors import ContainerError
 from docker.types import Mount
-from pymongo import MongoClient
-
 from dotenv import load_dotenv
+from pymongo import MongoClient
 
 load_dotenv()  # take environment variables from .env.
 
@@ -150,7 +149,7 @@ def set_logger(task_id, level="info"):
 def status_update(task_id, status, sysinfo=None):
     """Update status in DB"""
     logger = logging.getLogger(task_id)
-    
+
     try:
         logger.info("Updating status %s:%s", task_id, status)
         mongo = MongoClient(MONGO_URL)
@@ -227,6 +226,9 @@ def run_container(dkr, task_id):
     try:
         # Create the mounts
         task_folder = os.path.join(ROOT_FOLDER, task_id)
+        logger.debug("Creating task_dir %s", task_folder)
+
+        # Mounts
         mounts = [
             Mount(
                 source=f"{task_folder}", target=f"{STANDARD_MOUNT_PATH}", type="bind"
@@ -235,8 +237,12 @@ def run_container(dkr, task_id):
                 source=f"{MODELS_FOLDER}", target=f"{MODELS_MOUNT_PATH}", type="bind"
             ),
         ]
+
+        # Environment variables from secrets
         env = get_secrets()
-        logger.info("Created mounts and env vars %s", env)
+        logger.debug("Created mounts and env vars %s", env)
+
+        # Check for GPU
         device_requests = []
         try:
             _ = subprocess.check_output("nvidia-smi")
@@ -270,6 +276,7 @@ def run_container(dkr, task_id):
             device_requests=device_requests,
         )
 
+        # Log the container output
         if isinstance(container, bytes):
             logger.info("=============================================")
             logs = container.decode("utf-8")
@@ -277,7 +284,7 @@ def run_container(dkr, task_id):
                 logger.info(logs)
             logger.info("=============================================")
 
-            return {"success": True}
+        return {"success": True}
 
     except ContainerError as cerr:
         logger.error(cerr.container.logs())
@@ -345,7 +352,7 @@ def process_message(msg):
 
         # return result
         return result
-    
+
     except Exception as err:
         print("**ERROR in Worker Main Function**", err)
         print(traceback.format_exc())
@@ -373,7 +380,7 @@ def main():
             )
             for message in messages:
                 result = process_message(message)
-                if result['success']:
+                if result["success"]:
                     print("Deleting message: ", message.message_id)
                     message.delete()
                 else:
