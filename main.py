@@ -21,17 +21,19 @@ from pymongo import MongoClient
 
 load_dotenv()  # take environment variables from .env.
 
-# AWS parameters
+# AWS parameters (for SQS and CloudWatch)
 AWS_ACCOUNT = os.getenv("AWS_ACCOUNT", "910371487650")
 AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
-QUEUE_NAME = os.getenv("SQS_QUEUE", "atomQueueStandard")
-SECRETS_NAME = os.getenv("SECRETS_NAME", "t2d2/mongo-iN9rsm")
-LOGS_GROUP = os.getenv("LOGS_GROUP", "atom_workers")
+QUEUE_NAME = os.getenv("AWS_SQS_QUEUE", "atomQueueStandard")
+SECRETS_NAME = os.getenv("AWS_SECRETS_NAME", "t2d2/mongo-iN9rsm")
+LOGS_GROUP = os.getenv("AWS_CW_LOGGROUP", "atom_workers")
 
-# Database connection
+# Database connection (to update task status)
 MONGO_URL = os.getenv("MONGO_URL", "")
 MONGO_DATABASE = os.getenv("MONGO_DATABASE", "atom")
 MONGO_COLLECTION = os.getenv("MONGO_COLLECTION", "tasks")
+
+# Limits to docker container
 MEM_LIMIT = os.getenv("MEM_LIMIT", "8g")
 MEMSWAP_LIMIT = os.getenv("MEMSWAP_LIMIT", "8g")
 
