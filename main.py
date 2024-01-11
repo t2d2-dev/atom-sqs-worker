@@ -26,7 +26,7 @@ load_dotenv()  # take environment variables from .env.
 AWS_ACCOUNT = os.getenv("AWS_ACCOUNT", "910371487650")
 AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
 QUEUE_NAME = os.getenv("SQS_QUEUE", "atomQueueStandard")
-SECRETS_NAME = os.getenv("SECRETS_NAME", "production-atom-celery-queue-1-zPDi3C")
+SECRETS_NAME = os.getenv("SECRETS_NAME", "t2d2/mongo-iN9rsm")
 LOGS_GROUP = os.getenv("LOGS_GROUP", "atom_workers")
 
 # Database connection
