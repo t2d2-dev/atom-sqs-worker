@@ -25,13 +25,9 @@ load_dotenv()  # take environment variables from .env.
 AWS_ACCOUNT = os.getenv("AWS_ACCOUNT", "910371487650")
 AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
 QUEUE_NAME = os.getenv("AWS_SQS_QUEUE", "atomQueueStandard")
-SECRETS_NAME = os.getenv("AWS_SECRETS_NAME", "t2d2/mongo-iN9rsm")
+SECRETS_ARN = os.getenv("AWS_SECRETS_ARN", None)
 LOGS_GROUP = os.getenv("AWS_CW_LOGGROUP", "atom_workers")
-
-# Database connection (to update task status)
-MONGO_URL = os.getenv("MONGO_URL", "")
-MONGO_DATABASE = os.getenv("MONGO_DATABASE", "atom")
-MONGO_COLLECTION = os.getenv("MONGO_COLLECTION", "tasks")
+MONGO_URL = os.getenv("MONGO_URL", "mongodb://localhost:27017")
 
 # Limits to docker container
 MEM_LIMIT = os.getenv("MEM_LIMIT", "8g")
@@ -42,10 +38,10 @@ WAIT_TIME = int(os.getenv("WAIT_TIME", "10"))
 VISIBILITY_TIMEOUT = int(os.getenv("VISIBILITY_TIMEOUT", "7200"))
 
 # Paths and mounts
-ROOT_FOLDER = "/tmp"
-STANDARD_MOUNT_PATH = "/data"
+APPDATA_FOLDER = os.getenv("APPDATA_FOLDER", "/tmp")
+MODELS_FOLDER = os.getenv("MODEL_FOLDER", "/")
+APPDATA_MOUNT_PATH = "/data"
 MODELS_MOUNT_PATH = "/models"
-MODELS_FOLDER = "/"
 
 
 class SignalHandler:
@@ -61,17 +57,12 @@ class SignalHandler:
         self.received_signal = True
 
 
-def get_secrets():
+def get_secrets(secrets_arn=SECRETS_ARN):
     """Get secrets for environment"""
-    if not SECRETS_NAME:
+    if not secrets_arn:
         return {}
-    secrets_arn = (
-        f"arn:aws:secretsmanager:{AWS_REGION}:{AWS_ACCOUNT}:secret:{SECRETS_NAME}"
-    )
     client = boto3.client("secretsmanager")
-    response = client.get_secret_value(
-        SecretId=secrets_arn,
-    )
+    response = client.get_secret_value(SecretId=secrets_arn)
     return json.loads(response["SecretString"])
 
 
@@ -148,15 +139,15 @@ def set_logger(task_id, level="info"):
     logging.getLogger(task_id).addHandler(handler)
 
 
-def status_update(task_id, status, sysinfo=None):
+def status_update(task_id, status, sysinfo=None, env="dev"):
     """Update status in DB"""
     logger = logging.getLogger(task_id)
 
     try:
-        logger.info("Updating status %s:%s", task_id, status)
+        logger.info("Updating status %s:%s", task_id, status)        
         mongo = MongoClient(MONGO_URL)
-        db = mongo[MONGO_DATABASE]
-        collection = db[MONGO_COLLECTION]
+        db = mongo[f"t2d2-v2-{env}-db"]
+        collection = db['tasks']
         now = datetime.now()
 
         # Insert if not found
@@ -182,14 +173,15 @@ def status_update(task_id, status, sysinfo=None):
         logger.warning(traceback.format_exc())
 
 
-def check_message_status(task_id):
+def check_message_status(task_id, env="dev"):
     """Check to see if message is stopped / cancelled"""
     try:
         logger = logging.getLogger(task_id)
         logger.info("Checking task status %s", task_id)
         mongo = MongoClient(MONGO_URL)
-        db = mongo[MONGO_DATABASE]
-        collection = db[MONGO_COLLECTION]
+        db = mongo[f"t2d2-v2-{env}-db"]
+        collection = db['tasks']
+
         now = datetime.now()
 
         # Insert if not found
@@ -227,13 +219,13 @@ def run_container(dkr, task_id):
     logger = logging.getLogger(task_id)
     try:
         # Create the mounts
-        task_folder = os.path.join(ROOT_FOLDER, task_id)
+        task_folder = os.path.join(APPDATA_FOLDER, task_id)
         logger.debug("Creating task_dir %s", task_folder)
 
         # Mounts
         mounts = [
             Mount(
-                source=f"{task_folder}", target=f"{STANDARD_MOUNT_PATH}", type="bind"
+                source=f"{task_folder}", target=f"{APPDATA_MOUNT_PATH}", type="bind"
             ),
             Mount(
                 source=f"{MODELS_FOLDER}", target=f"{MODELS_MOUNT_PATH}", type="bind"
@@ -305,6 +297,7 @@ def process_message(msg):
         event = json.loads(msg.body)
         dkr = event["docker"]
         config = event.get("config", {})
+        task_env = event.get("env", "dev")
 
         # Setup cloudwatch logger
         set_logger(task_id, event.get("log_level", "info"))
@@ -315,7 +308,7 @@ def process_message(msg):
         logger.info(sysinfo)
 
         # Check to see if message is cancelled or stopped
-        if check_message_status(task_id):
+        if check_message_status(task_id, env=task_env):
             return {
                 "success": False,
                 "function": "process_message",
@@ -323,13 +316,13 @@ def process_message(msg):
             }
 
         # Update status
-        status_update(task_id, status="running", sysinfo=sysinfo)
+        status_update(task_id, status="running", sysinfo=sysinfo, env=task_env)
 
         # Get input
         logger.debug("Parsed Message: \nID: %s \nCONFIG: %s", task_id, config)
 
         # Create all task folders
-        task_folder = os.path.join(ROOT_FOLDER, task_id)
+        task_folder = os.path.join(APPDATA_FOLDER, task_id)
         input_folder = os.path.join(task_folder, "input")
         logs_folder = os.path.join(task_folder, "logs")
         output_folder = os.path.join(task_folder, "output")
@@ -348,9 +341,9 @@ def process_message(msg):
 
         # Update success/failure status
         if result["success"]:
-            status_update(task_id, "completed")
+            status_update(task_id, "completed", env=task_env)
         else:
-            status_update(task_id, "failed")
+            status_update(task_id, "failed", env=task_env)
 
         # return result
         return result
