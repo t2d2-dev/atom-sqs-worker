@@ -283,59 +283,65 @@ def run_container(dkr, task_id):
 
 def process_message(msg):
     """Process message"""
-    task_id = msg.message_id
-    event = json.loads(msg.body)
-    dkr = event["docker"]
-    config = event.get("config", {})
+    try:
+        task_id = msg.message_id
+        event = json.loads(msg.body)
+        dkr = event["docker"]
+        config = event.get("config", {})
 
-    # Setup cloudwatch logger
-    set_logger(task_id, event.get("log_level", "info"))
-    logger = logging.getLogger(task_id)
+        # Setup cloudwatch logger
+        set_logger(task_id, event.get("log_level", "info"))
+        logger = logging.getLogger(task_id)
 
-    # Log system info
-    sysinfo = get_instance_data()
-    logger.info(sysinfo)
+        # Log system info
+        sysinfo = get_instance_data()
+        logger.info(sysinfo)
 
-    # Check to see if message is cancelled or stopped
-    if check_message_status(task_id):
-        return {
-            "success": False,
-            "function": "process_message",
-            "err": "Task is cancelled",
-        }
+        # Check to see if message is cancelled or stopped
+        if check_message_status(task_id):
+            return {
+                "success": False,
+                "function": "process_message",
+                "err": "Task is cancelled",
+            }
 
-    # Update status
-    status_update(task_id, status="running", sysinfo=sysinfo)
+        # Update status
+        status_update(task_id, status="running", sysinfo=sysinfo)
 
-    # Get input
-    logger.debug("Parsed Message: \nID: %s \nCONFIG: %s", task_id, config)
+        # Get input
+        logger.debug("Parsed Message: \nID: %s \nCONFIG: %s", task_id, config)
 
-    # Create all task folders
-    task_folder = os.path.join(ROOT_FOLDER, task_id)
-    input_folder = os.path.join(task_folder, "input")
-    logs_folder = os.path.join(task_folder, "logs")
-    output_folder = os.path.join(task_folder, "output")
-    for folder in [input_folder, logs_folder, output_folder]:
-        logger.debug("Creating folder: %s", folder)
-        os.makedirs(folder)
+        # Create all task folders
+        task_folder = os.path.join(ROOT_FOLDER, task_id)
+        input_folder = os.path.join(task_folder, "input")
+        logs_folder = os.path.join(task_folder, "logs")
+        output_folder = os.path.join(task_folder, "output")
+        for folder in [input_folder, logs_folder, output_folder]:
+            logger.debug("Creating folder: %s", folder)
+            os.makedirs(folder)
 
-    # Write the task config
-    config_file = os.path.join(input_folder, "task_config.json")
-    with open(config_file, "w", encoding="utf-8") as f:
-        json.dump(config, f, indent=2)
-    logger.info("Wrote %s", config_file)
+        # Write the task config
+        config_file = os.path.join(input_folder, "task_config.json")
+        with open(config_file, "w", encoding="utf-8") as f:
+            json.dump(config, f, indent=2)
+        logger.info("Wrote %s", config_file)
 
-    # Run the docker processor
-    result = run_container(dkr, task_id)
+        # Run the docker processor
+        result = run_container(dkr, task_id)
 
-    # Update success/failure status
-    if result["success"]:
-        status_update(task_id, "completed")
-    else:
-        status_update(task_id, "failed")
+        # Update success/failure status
+        if result["success"]:
+            status_update(task_id, "completed")
+        else:
+            status_update(task_id, "failed")
 
-    # return result
-    return result
+        # return result
+        return result
+    
+    except Exception as err:
+        print("**ERROR in Worker Main Function**", err)
+        print(traceback.format_exc())
+        return {"success": False, "function": "process_message", "err": err}
 
 
 #############################################################################
@@ -358,8 +364,13 @@ def main():
                 VisibilityTimeout=VISIBILITY_TIMEOUT,
             )
             for message in messages:
-                process_message(message)
-                message.delete()
+                result = process_message(message)
+                if result['success']:
+                    print("Deleting message: ", message.message_id)
+                    message.delete()
+                else:
+                    print("Changing message visibility: ", message.message_id)
+                    message.change_visibility(VisibilityTimeout=0)
 
     except Exception as err:
         print("**ERROR in Worker Main Function**", err)
