@@ -145,8 +145,9 @@ def set_logger(task_id, level="info"):
 
 def status_update(task_id, status, sysinfo=None):
     """Update status in DB"""
+    logger = logging.getLogger(task_id)
+    
     try:
-        logger = logging.getLogger(task_id)
         logger.info("Updating status %s:%s", task_id, status)
         mongo = MongoClient(MONGO_URL)
         db = mongo[MONGO_DATABASE]
@@ -172,8 +173,8 @@ def status_update(task_id, status, sysinfo=None):
         return result
 
     except Exception as err:
-        print("*WARNING* Could not update task ", err)
-        print(traceback.format_exc())
+        logger.warning("*WARNING* Could not update task %s", err)
+        logger.warning(traceback.format_exc())
 
 
 def check_message_status(task_id):
@@ -231,6 +232,7 @@ def run_container(dkr, task_id):
             ),
         ]
         env = get_secrets()
+        logger.info("Created mounts and env vars %s", env)
         device_requests = []
         try:
             _ = subprocess.check_output("nvidia-smi")
