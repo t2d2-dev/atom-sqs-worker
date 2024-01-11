@@ -3,3 +3,4 @@ docker
 boto3
 requests
 psutil
+pymongo[srv]
