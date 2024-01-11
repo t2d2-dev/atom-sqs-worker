@@ -173,6 +173,7 @@ def status_update(task_id, status, sysinfo=None):
 
     except Exception as err:
         print("*WARNING* Could not update task ", err)
+        print(traceback.format_exc())
 
 
 def check_message_status(task_id):
@@ -211,6 +212,7 @@ def check_message_status(task_id):
         return False
     except Exception as err:
         print("*WARNING* Could not check task status ", err)
+        print(traceback.format_exc())
         return False
 
 
