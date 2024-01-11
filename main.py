@@ -18,6 +18,10 @@ from docker.errors import ContainerError
 from docker.types import Mount
 from pymongo import MongoClient
 
+from dotenv import load_dotenv
+
+load_dotenv()  # take environment variables from .env.
+
 # AWS parameters
 AWS_ACCOUNT = os.getenv("AWS_ACCOUNT", "910371487650")
 AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
