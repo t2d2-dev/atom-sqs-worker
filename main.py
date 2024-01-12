@@ -376,12 +376,8 @@ def main():
             )
             for message in messages:
                 result = process_message(message)
-                if result["success"]:
-                    print("Deleting message: ", message.message_id)
-                    message.delete()
-                else:
-                    print("Changing message visibility: ", message.message_id)
-                    message.change_visibility(VisibilityTimeout=0)
+                print('COMPLETED: ', result)
+                message.delete() # Delete message regardless of success/failure
 
     except Exception as err:
         print("**ERROR in Worker Main Function**", err)
