@@ -144,10 +144,10 @@ def status_update(task_id, status, sysinfo=None, env="dev"):
     logger = logging.getLogger(task_id)
 
     try:
-        logger.info("Updating status %s:%s", task_id, status)        
+        logger.info("Updating status %s:%s", task_id, status)
         mongo = MongoClient(MONGO_URL)
         db = mongo[f"t2d2-v2-{env}-db"]
-        collection = db['tasks']
+        collection = db["tasks"]
         now = datetime.now()
 
         # Insert if not found
@@ -180,7 +180,7 @@ def check_message_status(task_id, env="dev"):
         logger.info("Checking task status %s", task_id)
         mongo = MongoClient(MONGO_URL)
         db = mongo[f"t2d2-v2-{env}-db"]
-        collection = db['tasks']
+        collection = db["tasks"]
 
         now = datetime.now()
 
@@ -224,9 +224,7 @@ def run_container(dkr, task_id):
 
         # Mounts
         mounts = [
-            Mount(
-                source=f"{task_folder}", target=f"{APPDATA_MOUNT_PATH}", type="bind"
-            ),
+            Mount(source=f"{task_folder}", target=f"{APPDATA_MOUNT_PATH}", type="bind"),
             Mount(
                 source=f"{MODELS_FOLDER}", target=f"{MODELS_MOUNT_PATH}", type="bind"
             ),
@@ -274,14 +272,22 @@ def run_container(dkr, task_id):
                 mem_limit=MEM_LIMIT,
                 memswap_limit=MEMSWAP_LIMIT,
                 device_requests=device_requests,
+                detach=True,
             )
-            
-            if isinstance(container, bytes):
-                logger.info("=============================================")
-                logs = container.decode("utf-8")
-                if len(logs):
-                    logger.info(logs)
-                logger.info("=============================================")
+
+            # Wait for container to be done
+            result = container.wait()
+            logger.info("=============================================")
+            logs = container.logs().decode("utf-8")
+            if len(logs):
+                logger.info(logs)
+            logger.info("=============================================")
+
+            if result["StatusCode"] != 0:
+                logger.error(
+                    "Container exited with error code %s", result["StatusCode"]
+                )
+                return {"success": False, "function": "run_container", "err": result}
 
             return {"success": True}
 
@@ -289,8 +295,6 @@ def run_container(dkr, task_id):
             logger.error("Could not run container %s:%s", image, tag)
             logger.error(ex)
             return {"success": False, "function": "run_container", "err": ex}
-
-
 
     except ContainerError as cerr:
         logger.error(cerr.container.logs())
@@ -380,7 +384,7 @@ def main():
 
         # Continuously poll (long polling) for messages until SIGTERM/SIGKILL
         while not signal_handler.received_signal:
-            print('Polling for messages...')
+            print("Polling for messages...")
             messages = queue.receive_messages(
                 MaxNumberOfMessages=1,
                 WaitTimeSeconds=WAIT_TIME,
@@ -388,8 +392,8 @@ def main():
             )
             for message in messages:
                 result = process_message(message)
-                print('COMPLETED: ', result)
-                message.delete() # Delete message regardless of success/failure
+                print("COMPLETED: ", result)
+                message.delete()  # Delete message regardless of success/failure
 
     except Exception as err:
         print("**ERROR in Worker Main Function**", err)
