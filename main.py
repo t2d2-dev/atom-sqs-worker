@@ -264,16 +264,21 @@ def run_container(dkr, task_id):
 
         # Run the container
         logger.info("Container running...")
-        container = client.containers.run(
-            f"{image}:{tag}",
-            name=f"{task_id}",
-            mounts=mounts,
-            environment=env,
-            network_mode="host",
-            mem_limit=MEM_LIMIT,
-            memswap_limit=MEMSWAP_LIMIT,
-            device_requests=device_requests,
-        )
+        try:
+            container = client.containers.run(
+                f"{image}:{tag}",
+                name=f"{task_id}",
+                mounts=mounts,
+                environment=env,
+                network_mode="host",
+                mem_limit=MEM_LIMIT,
+                memswap_limit=MEMSWAP_LIMIT,
+                device_requests=device_requests,
+            )
+        except Exception as ex:
+            logger.error("Could not run container %s:%s", image, tag)
+            logger.error(ex)
+            return {"success": False, "function": "run_container", "err": ex}
 
         # Log the container output
         if isinstance(container, bytes):
