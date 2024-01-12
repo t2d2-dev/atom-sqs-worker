@@ -254,8 +254,13 @@ def run_container(dkr, task_id):
         # Pull Image
         image = dkr["image"]
         tag = dkr["tag"]
-        client.images.pull(image, tag)
-        logger.info("Pulled Image: %s:%s", image, tag)
+        try:
+            client.images.pull(image, tag)
+            logger.info("Pulled Image: %s:%s", image, tag)
+        except Exception as ex:
+            logger.error("Could not pull image %s:%s", image, tag)
+            logger.error(ex)
+            return {"success": False, "function": "pull_image", "err": ex}
 
         # Run the container
         logger.info("Container running...")
