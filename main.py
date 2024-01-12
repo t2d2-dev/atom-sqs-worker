@@ -275,20 +275,22 @@ def run_container(dkr, task_id):
                 memswap_limit=MEMSWAP_LIMIT,
                 device_requests=device_requests,
             )
+            
+            if isinstance(container, bytes):
+                logger.info("=============================================")
+                logs = container.decode("utf-8")
+                if len(logs):
+                    logger.info(logs)
+                logger.info("=============================================")
+
+            return {"success": True}
+
         except Exception as ex:
             logger.error("Could not run container %s:%s", image, tag)
             logger.error(ex)
             return {"success": False, "function": "run_container", "err": ex}
 
-        # Log the container output
-        if isinstance(container, bytes):
-            logger.info("=============================================")
-            logs = container.decode("utf-8")
-            if len(logs):
-                logger.info(logs)
-            logger.info("=============================================")
 
-        return {"success": True}
 
     except ContainerError as cerr:
         logger.error(cerr.container.logs())
