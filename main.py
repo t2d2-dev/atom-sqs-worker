@@ -368,6 +368,7 @@ def main():
 
         # Continuously poll (long polling) for messages until SIGTERM/SIGKILL
         while not signal_handler.received_signal:
+            print('Polling for messages...')
             messages = queue.receive_messages(
                 MaxNumberOfMessages=1,
                 WaitTimeSeconds=WAIT_TIME,
