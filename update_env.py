@@ -65,6 +65,8 @@ def get_models(bucket=MODELS_BUCKET, models=MODELS_PATH):
     for object in response.get("Contents", []):
         key = object["Key"]
         savefile = os.path.join(models, key)
+        print(f"Bucket:{bucket} Key:{key} Savefile:{savefile}")
+        os.makedirs(os.path.dirname(savefile), exist_ok=True)
         client.download_file(bucket, key, savefile)
 
     return
