@@ -38,8 +38,8 @@ WAIT_TIME = int(os.getenv("WAIT_TIME", "10"))
 VISIBILITY_TIMEOUT = int(os.getenv("VISIBILITY_TIMEOUT", "7200"))
 
 # Paths and mounts
-APPDATA_FOLDER = os.getenv("APPDATA_FOLDER", "/tmp")
-MODELS_FOLDER = os.getenv("MODEL_FOLDER", "/")
+APPDATA_FOLDER = os.getenv("APPDATA_FOLDER", "/opt/tasks")
+MODELS_FOLDER = os.getenv("MODEL_FOLDER", "/opt/models")
 APPDATA_MOUNT_PATH = "/data"
 MODELS_MOUNT_PATH = "/models"
 
