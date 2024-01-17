@@ -214,7 +214,7 @@ def check_message_status(task_id, env="dev"):
         return False
 
 
-def run_container(dkr, task_id):
+def run_container(dkr, task_id, envvars=None):
     """Pull the image and run the container"""
     logger = logging.getLogger(task_id)
     try:
@@ -229,10 +229,13 @@ def run_container(dkr, task_id):
                 source=f"{MODELS_FOLDER}", target=f"{MODELS_MOUNT_PATH}", type="bind"
             ),
         ]
+        logger.debug("Created mounts")
 
         # Environment variables from secrets
         env = get_secrets()
-        logger.debug("Created mounts and env vars %s", env)
+        if envvars:
+            env.update(envvars)
+        logger.debug("Updated env vars %s", env)
 
         # Check for GPU
         device_requests = []
@@ -314,6 +317,7 @@ def process_message(msg):
         dkr = event["docker"]
         config = event.get("config", {})
         task_env = event.get("env", "dev")
+        task_envvars = event.get("envvars", None)
 
         # Setup cloudwatch logger
         set_logger(task_id, event.get("log_level", "info"))
@@ -353,7 +357,7 @@ def process_message(msg):
         logger.info("Wrote %s", config_file)
 
         # Run the docker processor
-        result = run_container(dkr, task_id)
+        result = run_container(dkr, task_id, task_envvars)
 
         # Update success/failure status
         if result["success"]:
