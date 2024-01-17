@@ -383,14 +383,18 @@ def main():
         queue = sqs.Queue(queue_url)
 
         # Continuously poll (long polling) for messages until SIGTERM/SIGKILL
+        count, heartbeat = 0, ['_','-']
         while not signal_handler.received_signal:
-            print("Polling for messages...")
+            count += 1
+            print(heartbeat[count % 2], end="")
+            if count % 80 == 0: print("")
             messages = queue.receive_messages(
                 MaxNumberOfMessages=1,
                 WaitTimeSeconds=WAIT_TIME,
                 VisibilityTimeout=VISIBILITY_TIMEOUT,
             )
             for message in messages:
+		print("\nRECEIVED: ", message.message_id)
                 result = process_message(message)
                 print("COMPLETED: ", result)
                 message.delete()  # Delete message regardless of success/failure
