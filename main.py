@@ -28,6 +28,7 @@ QUEUE_NAME = os.getenv("AWS_SQS_QUEUE", "atomQueueStandard")
 SECRETS_ARN = os.getenv("AWS_SECRETS_ARN", None)
 LOGS_GROUP = os.getenv("AWS_CW_LOGGROUP", "atom_workers")
 MONGO_URL = os.getenv("MONGO_URL", "mongodb://localhost:27017")
+AUTOSCALING_GROUP_NAME = os.getenv("AUTOSCALING_GROUP_NAME", "ATOM worker asg")
 
 # Limits to docker container
 MEM_LIMIT = os.getenv("MEM_LIMIT", "8g")
@@ -116,6 +117,23 @@ def get_instance_data():
             info[key] = res.content.decode("utf-8")
 
     return info
+
+
+def set_instance_protection(protect=True):
+    """Set instance protection"""
+    try:
+        client = boto3.client("autoscaling")
+        instance_id = get_instance_data()["instance-id"]
+        client.set_instance_protection(
+            InstanceIds=[instance_id],
+            AutoScalingGroupName=AUTOSCALING_GROUP_NAME,
+            ProtectedFromScaleIn=protect,
+        )
+        return True
+    except Exception as err:
+        print("*WARNING* Could not set instance protection ", err)
+        print(traceback.format_exc())
+        return False
 
 
 def set_logger(task_id, level="info"):
@@ -387,7 +405,7 @@ def main():
         queue = sqs.Queue(queue_url)
 
         # Continuously poll (long polling) for messages until SIGTERM/SIGKILL
-        count, heartbeat = 0, ['_','-']
+        count, heartbeat = 0, ["_", "-"]
         while not signal_handler.received_signal:
             count += 1
             print(heartbeat[count % 2], end="")
@@ -399,10 +417,12 @@ def main():
                 VisibilityTimeout=VISIBILITY_TIMEOUT,
             )
             for message in messages:
-                print("\nRECEIVED: ", message.message_id)
+                print("\nRECEIVED: ", message.message_id, "\nINSTANCE PROTECTED")
+                set_instance_protection(protect=True)
                 result = process_message(message)
-                print("COMPLETED: ", result)
                 message.delete()  # Delete message regardless of success/failure
+                set_instance_protection(protect=False)
+                print("COMPLETED: ", result, "\nINSTANCE UNPROTECTED")
 
     except Exception as err:
         print("**ERROR in Worker Main Function**", err)
