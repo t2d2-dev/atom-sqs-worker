@@ -317,7 +317,7 @@ def process_message(msg):
         dkr = event["docker"]
         config = event.get("config", {})
         task_env = event.get("env", "dev")
-        task_envvars = event.get("envvars", None)
+        task_envvars = event.get("env_vars", None)
 
         # Setup cloudwatch logger
         set_logger(task_id, event.get("log_level", "info"))
@@ -328,6 +328,10 @@ def process_message(msg):
         logger.info(sysinfo)
 
         # Check to see if message is cancelled or stopped
+        if task_env.startswith("dev"):
+            task_env = "dev"
+        elif task_env.startswith("prod"):
+            task_env = "prod"
         if check_message_status(task_id, env=task_env):
             return {
                 "success": False,
