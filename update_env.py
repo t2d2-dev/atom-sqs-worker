@@ -62,17 +62,17 @@ def get_models(bucket=MODELS_BUCKET, models=MODELS_PATH):
     print("Getting Models")
     client = boto3.client("s3")
     response = client.list_objects(Bucket=bucket)
-    for object in response.get("Contents", []):
-        key = object["Key"]
+    for obj in response.get("Contents", []):
+        key = obj["Key"]
         savefile = os.path.join(models, key)
-        print(f"Bucket:{bucket} Key:{key} Savefile:{savefile}")
-        os.makedirs(os.path.dirname(savefile), exist_ok=True)
-        client.download_file(bucket, key, savefile)
+        if not os.path.exists(savefile):
+            print(f"Bucket:{bucket} Key:{key} Savefile:{savefile}")
+            os.makedirs(os.path.dirname(savefile), exist_ok=True)
+            client.download_file(bucket, key, savefile)
 
     return
 
 
-"""Main entrypoint"""
 if __name__ == "__main__":
     os.makedirs(APPDATA_PATH, exist_ok=True)
     os.makedirs(MODELS_PATH, exist_ok=True)
