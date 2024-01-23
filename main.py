@@ -238,7 +238,7 @@ def run_container(dkr, task_id, envvars=None):
     try:
         # Create the mounts
         task_folder = os.path.join(APPDATA_FOLDER, task_id)
-        logger.debug("Creating task_dir %s", task_folder)
+        logger.info("Creating task_dir %s", task_folder)
 
         # Mounts
         mounts = [
@@ -247,13 +247,13 @@ def run_container(dkr, task_id, envvars=None):
                 source=f"{MODELS_FOLDER}", target=f"{MODELS_MOUNT_PATH}", type="bind"
             ),
         ]
-        logger.debug("Created mounts")
+        logger.info("Created mounts")
 
         # Environment variables from secrets
         env = get_secrets()
         if envvars:
             env.update(envvars)
-        logger.debug("Updated env vars %s", env)
+        logger.info("Updated env vars %s", env)
 
         # Check for GPU
         device_requests = []
