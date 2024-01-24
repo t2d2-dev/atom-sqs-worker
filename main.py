@@ -382,6 +382,9 @@ def process_message(msg):
         # Run the docker processor
         if not task_envvars:
             task_envvars = {'ENVIRONMENT': task_env}
+        else:
+            task_envvars.update({'ENVIRONMENT': task_env})
+
         result = run_container(dkr, task_id, task_envvars)
 
         # Update success/failure status
