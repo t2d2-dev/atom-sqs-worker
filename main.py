@@ -253,7 +253,7 @@ def run_container(dkr, task_id, envvars=None):
         env = get_secrets()
         if envvars:
             env.update(envvars)
-        logger.env("Updated env vars")
+        logger.info("Updated env vars")
         logger.debug("Env = %s", env)
 
         # Check for GPU
