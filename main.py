@@ -175,7 +175,7 @@ def status_update(task_id, status, sysinfo=None, env="dev", task_envvars=None):
         # Insert if not found
         task = collection.find_one({"task_id": task_id})
 
-        payload = {"status": status, "updated_at": now}
+        payload = {"status": status}
         if sysinfo:
             payload["agent"] = sysinfo
 
