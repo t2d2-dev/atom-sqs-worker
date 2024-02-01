@@ -188,9 +188,9 @@ def status_update(task_id, status, sysinfo=None, env="dev", task_envvars=None):
             payload["duration"] = delta.days * 86400 + delta.seconds
 
         # result = collection.update_one({"task_id": task_id}, {"$set": update})
-        base_url = task_envvars.get("T2D2_API_URL", "https://api-v3-dev.t2d2.ai/api")
+        base_url = task_envvars.get("T2D2_API_URL", "https://api-v3-dev.t2d2.ai/api/")
         task_owner_token = task_envvars.get("TASK_OWNER_TOKEN", None)
-        url = base_url + f"/task/update/{task_id}"
+        url = base_url + f"task/update/{task_id}"
         headers = {"Content-Type": "application/json", "x-api-key": task_owner_token}
         res = requests.put(url, json=payload, headers=headers, timeout=30)
 
