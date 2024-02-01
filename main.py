@@ -157,7 +157,7 @@ def set_logger(task_id, level="info"):
     logging.getLogger(task_id).addHandler(handler)
 
 
-def status_update(task_id, status, sysinfo=None, env="dev"):
+def status_update(task_id, status, sysinfo=None, env="dev", task_envvars=None):
     """Update status in DB"""
     logger = logging.getLogger(task_id)
 
@@ -168,23 +168,33 @@ def status_update(task_id, status, sysinfo=None, env="dev"):
         collection = db["tasks"]
         now = datetime.now()
 
+        # Task environment
+        if task_envvars is None:
+            task_envvars = {"ENVIRONMENT": env}
+
         # Insert if not found
         task = collection.find_one({"task_id": task_id})
 
-        update = {"status": status, "updated_at": now}
+        payload = {"status": status, "updated_at": now}
         if sysinfo:
-            update["agent"] = sysinfo
+            payload["agent"] = sysinfo
 
         if status == "running":
             delta = now - task.get("created_at", now)
-            update["duration_queue"] = delta.days * 86400 + delta.seconds
+            payload["duration_queue"] = delta.days * 86400 + delta.seconds
 
         elif status == "completed":
             delta = now - task.get("updated_at", now)
-            update["duration"] = delta.days * 86400 + delta.seconds
+            payload["duration"] = delta.days * 86400 + delta.seconds
 
-        result = collection.update_one({"task_id": task_id}, {"$set": update})
-        return result
+        # result = collection.update_one({"task_id": task_id}, {"$set": update})
+        base_url = task_envvars.get("T2D2_API_URL", "https://api-v3-dev.t2d2.ai/api")
+        task_owner_token = task_envvars.get("TASK_OWNER_TOKEN", None)
+        url = base_url + f"/task/update/{task_id}"
+        headers = {"Content-Type": "application/json", "x-api-key": task_owner_token}
+        res = requests.put(url, json=payload, headers=headers, timeout=30)
+
+        return res.json()
 
     except Exception as err:
         logger.warning("*WARNING* Could not update task %s", err)
@@ -330,14 +340,15 @@ def run_container(dkr, task_id, envvars=None):
 
 def process_message(msg):
     """Process message"""
-    try:
-        task_id = msg.message_id
-        event = json.loads(msg.body)
-        dkr = event["docker"]
-        config = event.get("config", {})
-        task_env = event.get("env", "dev")
-        task_envvars = event.get("env_vars", None)
 
+    task_id = msg.message_id
+    event = json.loads(msg.body)
+    dkr = event["docker"]
+    config = event.get("config", {})
+    task_env = event.get("env", "dev")
+    task_envvars = event.get("env_vars", None)
+
+    try:
         # Setup cloudwatch logger
         set_logger(task_id, event.get("log_level", "info"))
         logger = logging.getLogger(task_id)
@@ -359,7 +370,13 @@ def process_message(msg):
             }
 
         # Update status
-        status_update(task_id, status="running", sysinfo=sysinfo, env=task_env)
+        status_update(
+            task_id,
+            status="running",
+            sysinfo=sysinfo,
+            env=task_env,
+            task_envvars=task_envvars,
+        )
 
         # Get input
         logger.debug("Parsed Message: \nID: %s \nCONFIG: %s", task_id, config)
@@ -381,17 +398,17 @@ def process_message(msg):
 
         # Run the docker processor
         if not task_envvars:
-            task_envvars = {'ENVIRONMENT': task_env}
+            task_envvars = {"ENVIRONMENT": task_env}
         else:
-            task_envvars.update({'ENVIRONMENT': task_env})
+            task_envvars.update({"ENVIRONMENT": task_env})
 
         result = run_container(dkr, task_id, task_envvars)
 
         # Update success/failure status
         if result["success"]:
-            status_update(task_id, "completed", env=task_env)
+            status_update(task_id, "completed", env=task_env, task_envvars=task_envvars)
         else:
-            status_update(task_id, "failed", env=task_env)
+            status_update(task_id, "failed", env=task_env, task_envvars=task_envvars)
 
         # return result
         return result
@@ -399,6 +416,7 @@ def process_message(msg):
     except Exception as err:
         print("**ERROR in Worker Main Function**", err)
         print(traceback.format_exc())
+        status_update(task_id, "failed", env=task_env, task_envvars=task_envvars)
         return {"success": False, "function": "process_message", "err": err}
 
 
