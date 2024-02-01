@@ -193,8 +193,9 @@ def status_update(task_id, status, sysinfo=None, env="dev", task_envvars=None):
         url = base_url + f"task/update/{task_id}"
         headers = {"Content-Type": "application/json", "x-api-key": task_owner_token}
         res = requests.put(url, json=payload, headers=headers, timeout=30)
+        logger.info(res.json())
 
-        return res.json()
+        return
 
     except Exception as err:
         logger.warning("*WARNING* Could not update task %s", err)
