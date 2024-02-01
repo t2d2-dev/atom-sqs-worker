@@ -158,7 +158,11 @@ def set_logger(task_id, level="info"):
 
 
 def status_update(task_id, status, project_id=0, sysinfo=None, env="dev", task_envvars=None):
-    """Update status in DB"""
+    """Update status in DB
+    TODO:
+    - Cleanup arguments: env, task_envvars, project_id, ENVIRONMENT
+    - Remove dependency on MongoDB
+    """
     logger = logging.getLogger(task_id)
 
     try:
@@ -167,10 +171,6 @@ def status_update(task_id, status, project_id=0, sysinfo=None, env="dev", task_e
         db = mongo[f"t2d2-v2-{env}-db"]
         collection = db["tasks"]
         now = datetime.now()
-
-        # Task environment
-        if task_envvars is None:
-            task_envvars = {"ENVIRONMENT": env}
 
         # Insert if not found
         task = collection.find_one({"task_id": task_id})
@@ -188,6 +188,8 @@ def status_update(task_id, status, project_id=0, sysinfo=None, env="dev", task_e
             payload["duration"] = delta.days * 86400 + delta.seconds
 
         # result = collection.update_one({"task_id": task_id}, {"$set": update})
+        if task_envvars is None:
+            task_envvars = {}
         base_url = task_envvars.get("T2D2_API_URL", "https://api-v3-dev.t2d2.ai/api/")
         task_owner_token = task_envvars.get("TASK_OWNER_TOKEN", None)
         url = base_url + f"{project_id}/task/update/{task_id}"
