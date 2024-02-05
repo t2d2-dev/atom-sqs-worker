@@ -280,9 +280,20 @@ def run_container(dkr, task_id, envvars=None):
         except:
             logger.info("GPU not found.")
 
-        # Create client
-        client = docker.from_env()
-        logger.info("Created docker client")
+        # Create client (Sometimes docker takes time to get started. So wait and try)
+        MAX_ATTEMPTS = 5
+        for i in range(MAX_ATTEMPTS):
+            try:
+                client = docker.from_env()
+                logger.info("Created docker client")
+                break
+            except Exception as ex:
+                logger.warning("Docker startup failed. Attempt %d of %d: %s", i, MAX_ATTEMPTS, ex)
+                sleep(5)
+                if i == MAX_ATTEMPTS:
+                    logger.error("Could not initialize Docker")
+                    logger.error(ex)
+                    return {"success": False, "function": "docker_initialize", "err": ex}
 
         # Pull Image
         image = dkr["image"]
