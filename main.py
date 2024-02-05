@@ -8,6 +8,7 @@ import subprocess
 import traceback
 from datetime import datetime
 from signal import SIGINT, SIGTERM, signal
+from time import sleep
 
 import boto3
 import docker
