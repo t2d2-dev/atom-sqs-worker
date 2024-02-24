@@ -282,16 +282,16 @@ def run_container(dkr, task_id, envvars=None):
             logger.info("GPU not found.")
 
         # Create client (Sometimes docker takes time to get started. So wait and try)
-        MAX_ATTEMPTS = 5
-        for i in range(MAX_ATTEMPTS):
+        max_attempts = 5
+        for i in range(max_attempts):
             try:
                 client = docker.from_env()
                 logger.info("Created docker client")
                 break
             except Exception as ex:
-                logger.warning("Docker startup failed. Attempt %d of %d: %s", i, MAX_ATTEMPTS, ex)
+                logger.warning("Docker startup failed. Attempt %d of %d: %s", i, max_attempts, ex)
                 sleep(5)
-                if i == MAX_ATTEMPTS:
+                if i == max_attempts:
                     logger.error("Could not initialize Docker")
                     logger.error(ex)
                     return {"success": False, "function": "docker_initialize", "err": ex}
@@ -372,6 +372,12 @@ def process_message(msg):
         # Log system info
         sysinfo = get_instance_data()
         logger.info(sysinfo)
+
+        # Log task info
+        logger.info("Task ID: %s", task_id)
+        logger.info("Project ID: %s", project_id)
+        logger.info("Docker: %s", dkr)
+        logger.info("Config: %s", config)
 
         # Check to see if message is cancelled or stopped
         if task_env.startswith("dev"):
