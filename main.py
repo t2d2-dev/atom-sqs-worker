@@ -1,4 +1,5 @@
 """SQS Listener"""
+
 # pylint: disable = W0702
 import json
 import logging
@@ -19,6 +20,8 @@ from docker.errors import ContainerError
 from docker.types import Mount
 from dotenv import load_dotenv
 from pymongo import MongoClient
+
+from update_env import APPDATA_PATH, disk_cleanup
 
 load_dotenv()  # take environment variables from .env.
 
@@ -158,7 +161,9 @@ def set_logger(task_id, level="info"):
     logging.getLogger(task_id).addHandler(handler)
 
 
-def status_update(task_id, status, project_id=0, sysinfo=None, env="dev", task_envvars=None):
+def status_update(
+    task_id, status, project_id=0, sysinfo=None, env="dev", task_envvars=None
+):
     """Update status in DB
     TODO:
     - Cleanup arguments: env, task_envvars, project_id, ENVIRONMENT
@@ -289,12 +294,18 @@ def run_container(dkr, task_id, envvars=None):
                 logger.info("Created docker client")
                 break
             except Exception as ex:
-                logger.warning("Docker startup failed. Attempt %d of %d: %s", i, max_attempts, ex)
+                logger.warning(
+                    "Docker startup failed. Attempt %d of %d: %s", i, max_attempts, ex
+                )
                 sleep(5)
                 if i == max_attempts:
                     logger.error("Could not initialize Docker")
                     logger.error(ex)
-                    return {"success": False, "function": "docker_initialize", "err": ex}
+                    return {
+                        "success": False,
+                        "function": "docker_initialize",
+                        "err": ex,
+                    }
 
         # Pull Image
         image = dkr["image"]
@@ -429,9 +440,21 @@ def process_message(msg):
 
         # Update success/failure status
         if result["success"]:
-            status_update(task_id, "completed", project_id=project_id, env=task_env, task_envvars=task_envvars)
+            status_update(
+                task_id,
+                "completed",
+                project_id=project_id,
+                env=task_env,
+                task_envvars=task_envvars,
+            )
         else:
-            status_update(task_id, "failed", project_id=project_id, env=task_env, task_envvars=task_envvars)
+            status_update(
+                task_id,
+                "failed",
+                project_id=project_id,
+                env=task_env,
+                task_envvars=task_envvars,
+            )
 
         # return result
         return result
@@ -439,7 +462,13 @@ def process_message(msg):
     except Exception as err:
         print("**ERROR in Worker Main Function**", err)
         print(traceback.format_exc())
-        status_update(task_id, "failed", project_id=project_id, env=task_env, task_envvars=task_envvars)
+        status_update(
+            task_id,
+            "failed",
+            project_id=project_id,
+            env=task_env,
+            task_envvars=task_envvars,
+        )
         return {"success": False, "function": "process_message", "err": err}
 
 
@@ -462,6 +491,8 @@ def main():
             print(heartbeat[count % 2], end="")
             if count % 80 == 0:
                 print("")
+                disk_cleanup(APPDATA_PATH)
+
             messages = queue.receive_messages(
                 MaxNumberOfMessages=1,
                 WaitTimeSeconds=WAIT_TIME,
