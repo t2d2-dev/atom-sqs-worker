@@ -48,7 +48,7 @@ def disk_cleanup(tasksdir=APPDATA_PATH):
     """Cleanup tasks folder if space is below threshold"""
     available = psutil.disk_usage("/").free
     print(
-        f"Disk cleanup. Available {available / (1024 * 1024 * 1024)}GB. Threshold {MIN_DISKSPACE / (1024 * 1024 * 1024)}GB"
+        f"Disk cleanup. Available {available / (1024 * 1024 * 1024):6.2f}GB. Threshold {MIN_DISKSPACE / (1024 * 1024 * 1024)}GB"
     )
     if available < MIN_DISKSPACE:
         for folder in os.listdir(tasksdir):
