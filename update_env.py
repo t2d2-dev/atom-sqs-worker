@@ -1,4 +1,5 @@
 """Python script to update environment variables"""
+
 import json
 import os
 import shutil
@@ -45,8 +46,10 @@ def env_update():
 
 def disk_cleanup(tasksdir=APPDATA_PATH):
     """Cleanup tasks folder if space is below threshold"""
-    print("Disk cleanup")
     available = psutil.disk_usage("/").free
+    print(
+        f"Disk cleanup. Available {available / (1024 * 1024 * 1024)}GB. Threshold {MIN_DISKSPACE / (1024 * 1024 * 1024)}GB"
+    )
     if available < MIN_DISKSPACE:
         for folder in os.listdir(tasksdir):
             print(f"Deleting: {os.path.join(tasksdir, folder)}")
