@@ -186,11 +186,11 @@ def status_update(
             payload["agent"] = sysinfo
 
         if status == "running":
-            delta = now - task.get("created_at", now)
+            delta = now - task.get("created_on", now)
             payload["duration_queue"] = delta.days * 86400 + delta.seconds
 
         elif status == "completed":
-            delta = now - task.get("updated_at", now)
+            delta = now - task.get("updated_on", now)
             payload["duration"] = delta.days * 86400 + delta.seconds
 
         # result = collection.update_one({"task_id": task_id}, {"$set": update})
@@ -214,7 +214,7 @@ def check_message_status(task_id, env="dev"):
     """Check to see if message is stopped / cancelled"""
     try:
         logger = logging.getLogger(task_id)
-        logger.info("Checking task status %s", task_id)
+        logger.info("Checking task status %s : env %s", task_id, env)
         mongo = MongoClient(MONGO_URL)
         db = mongo[f"t2d2-v2-{env}-db"]
         collection = db["tasks"]
