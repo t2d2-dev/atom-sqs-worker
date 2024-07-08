@@ -388,7 +388,8 @@ def process_message(msg):
         logger.info("Task ID: %s", task_id)
         logger.info("Project ID: %s", project_id)
         logger.info("Docker: %s", dkr)
-        logger.info("Config: %s", config)
+        logger.info("Config: ")
+        logger.info(config)
 
         # Check to see if message is cancelled or stopped
         if task_env.startswith("dev"):
