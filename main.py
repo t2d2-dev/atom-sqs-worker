@@ -216,7 +216,7 @@ def check_message_status(task_id, env="dev"):
         logger = logging.getLogger(task_id)
         logger.info("Checking task status %s : env %s", task_id, env)
         mongo = MongoClient(MONGO_URL)
-        db = mongo[f"t2d2-v2-{env}-db"]
+        db = mongo[f"t2d2-v3-{env}-db"]
         collection = db["tasks"]
 
         now = datetime.now()
