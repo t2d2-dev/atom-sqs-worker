@@ -174,7 +174,7 @@ def status_update(
     try:
         logger.info("Updating status %s:%s", task_id, status)
         mongo = MongoClient(MONGO_URL)
-        db = mongo[f"t2d2-v2-{env}-db"]
+        db = mongo[f"t2d2-v3-{env}-db"]
         collection = db["tasks"]
         now = datetime.now()
 
