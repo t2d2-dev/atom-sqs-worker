@@ -350,6 +350,7 @@ def run_container(dkr, task_id, envvars=None):
             return {"success": True}
 
         except Exception as ex:
+            logger.error(traceback.format_exc())
             logger.error("Could not run container %s:%s", image, tag)
             logger.error(ex)
             return {"success": False, "function": "run_container", "err": ex}
