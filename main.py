@@ -290,7 +290,7 @@ def run_container(dkr, task_id, envvars=None):
         max_attempts = 5
         for i in range(max_attempts):
             try:
-                client = docker.from_env()
+                client = docker.from_env(timeout=300)
                 logger.info("Created docker client")
                 break
             except Exception as ex:
