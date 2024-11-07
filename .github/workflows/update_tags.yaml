@@ -1,0 +1,25 @@
+name: Update git tags on push to v3-production
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  increment-version:
+    name: Increment version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Get next version
+        uses: reecetech/version-increment@2024.4.3
+        id: version
+        with:
+          scheme: conventional_commits
+      - name: Push git tags
+        run: 
+          git config --local user.email "bhiriyur@t2d2.ai" &&
+          git config --local user.name "Badri Hiriyur" &&
+          git tag -a v${{ steps.version.outputs.version }} -m "v${{ steps.version.outputs.version }}" &&
+          git push origin v${{ steps.version.outputs.version }}
