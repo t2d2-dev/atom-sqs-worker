@@ -16,6 +16,7 @@ import docker
 import psutil
 import requests
 import watchtower
+from botocore.exceptions import ClientError
 from docker.errors import ContainerError
 from docker.types import Mount
 from dotenv import load_dotenv
@@ -86,6 +87,9 @@ def get_system_info():
         info["mem_percent"] = psutil.virtual_memory().percent
         info["disk"] = str(round(psutil.disk_usage("/").total / (1024.0**3))) + " GB"
         info["disk_percent"] = psutil.disk_usage("/").percent
+
+        # Add Git tag info
+        info["GIT_TAG"] = write_tag()
 
         return info
     except Exception as e:
@@ -385,6 +389,21 @@ def process_message(msg):
         sysinfo = get_instance_data()
         logger.info(sysinfo)
 
+        # Return system info only if special message
+        if dkr == "GetSystemInfo":
+            status_update(
+                task_id,
+                "completed",
+                project_id=project_id,
+                env=task_env,
+                task_envvars=task_envvars,
+            )
+            return {
+                "success": True,
+                "function": "process_message",
+                "err": "Sys Info was requested",
+            }
+
         # Log task info
         logger.info("Task ID: %s", task_id)
         logger.info("Project ID: %s", project_id)
@@ -474,6 +493,53 @@ def process_message(msg):
         return {"success": False, "function": "process_message", "err": err}
 
 
+def upload_file(file_name, bucket, object_name=None):
+    """Upload a file to an S3 bucket
+
+    :param file_name: File to upload
+    :param bucket: Bucket to upload to
+    :param object_name: S3 object name. If not specified then file_name is used
+    :return: True if file was uploaded, else False
+    """
+
+    # If S3 object_name was not specified, use file_name
+    if object_name is None:
+        object_name = os.path.basename(file_name)
+
+    # Upload the file
+    s3_client = boto3.client("s3")
+    try:
+        response = s3_client.upload_file(file_name, bucket, object_name)
+        # print("Uploaded version file: ", response)
+    except ClientError as e:
+        logging.error(e)
+        return False
+    return True
+
+
+def write_tag():
+    """Writes git tag info to a file"""
+    try:
+        # cmd = "git tag -l"
+        # os.system(cmd)
+        tag_info = os.popen("git tag -l").read().strip()
+        commit_hash = os.popen("git rev-parse --short HEAD").read().strip()
+        current_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        filename = "atom-version.json"
+
+        # Write tag to S3
+        with open(filename, "w", encoding='utf-8') as f:
+            json.dump({'version': tag_info, 'date': current_date, 'commitHash': commit_hash}, f)
+        upload_file(file_name=filename, bucket="t2d2-assets-usa", object_name=f"version_info/{filename}")
+
+        return tag_info
+
+    except Exception as err:
+        print("**ERROR in Worker Git Tag Write Function**", err)
+        print(traceback.format_exc())
+        return ""
+
+
 #############################################################################
 # MAIN QUEUE LISTENER
 #############################################################################
@@ -486,6 +552,8 @@ def main():
         sqs = boto3.resource("sqs")
         queue = sqs.Queue(queue_url)
 
+        write_tag()
+
         # Continuously poll (long polling) for messages until SIGTERM/SIGKILL
         count, heartbeat = 0, ["_", "-"]
         while not signal_handler.received_signal:
@@ -494,6 +562,9 @@ def main():
             if count % 80 == 0:
                 print("")
                 disk_cleanup(APPDATA_PATH)
+
+                # Write Tag info to file
+                write_tag()
 
             messages = queue.receive_messages(
                 MaxNumberOfMessages=1,
