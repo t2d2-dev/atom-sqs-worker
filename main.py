@@ -522,15 +522,36 @@ def write_tag():
     try:
         # cmd = "git tag -l"
         # os.system(cmd)
-        tag_info = os.popen("git tag -l").read().strip()
-        commit_hash = os.popen("git rev-parse --short HEAD").read().strip()
-        current_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        p = subprocess.run(
+            ["git", "tag", "--points-at", "HEAD"],
+            cwd="atom-sqs-worker",
+            capture_output=True,
+            text=True,
+        )
+        tag_info = p.stdout.strip()
+
+        p = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd="atom-sqs-worker",
+            capture_output=True,
+            text=True,
+        )
+        commit_hash = p.stdout.strip()
+
+        current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         filename = "atom-version.json"
 
         # Write tag to S3
-        with open(filename, "w", encoding='utf-8') as f:
-            json.dump({'version': tag_info, 'date': current_date, 'commitHash': commit_hash}, f)
-        upload_file(file_name=filename, bucket="t2d2-assets-usa", object_name=f"version_info/{filename}")
+        with open(filename, "w", encoding="utf-8") as f:
+            json.dump(
+                {"version": tag_info, "date": current_date, "commitHash": commit_hash},
+                f,
+            )
+        upload_file(
+            file_name=filename,
+            bucket="t2d2-assets-usa",
+            object_name=f"version_info/{filename}",
+        )
 
         return tag_info
 
