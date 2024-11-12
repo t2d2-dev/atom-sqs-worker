@@ -509,7 +509,7 @@ def upload_file(file_name, bucket, object_name=None):
     # Upload the file
     s3_client = boto3.client("s3")
     try:
-        response = s3_client.upload_file(file_name, bucket, object_name)
+        s3_client.upload_file(file_name, bucket, object_name, ExtraArgs={'ACL': 'public-read'})
         # print("Uploaded version file: ", response)
     except ClientError as e:
         logging.error(e)
@@ -527,6 +527,7 @@ def write_tag():
             cwd="atom-sqs-worker",
             capture_output=True,
             text=True,
+            check=True,
         )
         tag_info = p.stdout.strip()
 
@@ -535,6 +536,7 @@ def write_tag():
             cwd="atom-sqs-worker",
             capture_output=True,
             text=True,
+            check=True
         )
         commit_hash = p.stdout.strip()
 
