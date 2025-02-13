@@ -269,6 +269,11 @@ def run_container(dkr, task_id, envvars=None):
             Mount(
                 source=f"{MODELS_FOLDER}", target=f"{MODELS_MOUNT_PATH}", type="bind"
             ),
+            Mount(
+                source="/var/run/docker.sock",
+                target="/var/run/docker.sock",
+                type="bind",
+            ),
         ]
         logger.info("Created mounts")
 
@@ -509,7 +514,9 @@ def upload_file(file_name, bucket, object_name=None):
     # Upload the file
     s3_client = boto3.client("s3")
     try:
-        s3_client.upload_file(file_name, bucket, object_name, ExtraArgs={'ACL': 'public-read'})
+        s3_client.upload_file(
+            file_name, bucket, object_name, ExtraArgs={"ACL": "public-read"}
+        )
         # print("Uploaded version file: ", response)
     except ClientError as e:
         logging.error(e)
@@ -536,7 +543,7 @@ def write_tag():
             cwd="atom-sqs-worker",
             capture_output=True,
             text=True,
-            check=True
+            check=True,
         )
         commit_hash = p.stdout.strip()
 
